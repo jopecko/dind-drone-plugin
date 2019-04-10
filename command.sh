@@ -58,7 +58,7 @@ echo "🚚 Pulling build image: ${PLUGIN_IMAGE}"
 docker pull ${PLUGIN_IMAGE} 2>&1 | sed 's/^/   /g'
 
 # Ensure that secrets (passed through as env vars) are available. Iterate and purposefully omit newlines.
-for k in $(compgen -e); do
+for k in $(compgen -e | grep -v PATH); do
   echo $k=${!k} >> ${PWD}/outer_env_vars.env
 done
 
