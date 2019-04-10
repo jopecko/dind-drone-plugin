@@ -1,18 +1,20 @@
 #!/bin/bash
 
-set -euo pipefail # Abort on error, strict variable interpolation, fail if piped command fails
+# Abort on error, strict variable interpolation, fail if piped command fails
+set -euo pipefail
+
 IMAGE_CACHE_DIR=${CI_WORKSPACE}/.dind
 
-if [[ "${PLUGIN_CMD:-}" == "" ]]; then
-  echo "One or more cmd arguments must be provided"
+if [[ "${PLUGIN_COMMANDS:-}" == "" ]]; then
+  echo "One or more commands must be provided"
   exit 1
 fi
 # If multiple cmd lines have been provided, chain them into something which we can execute with sh
 # Note that Drone provides these lines in comma separated form without escaping, which means commas in commands are known to break
-export PLUGIN_CMD=${PLUGIN_CMD//,/ && }
+export PLUGIN_COMMANDS=${PLUGIN_COMMANDS//,/ && }
 
 # Wrap command scriptlet in an invocation of sh
-export PLUGIN_CMD="sh -c '${PLUGIN_CMD}'"
+export PLUGIN_COMMANDS="sh -c '${PLUGIN_COMMANDS}'"
 
 echo "📦 Starting dind-drone-plugin"
 
@@ -37,7 +39,6 @@ if [[ -d $IMAGE_CACHE_DIR ]]; then
 fi
 set -e
 
-
 if [[ "${PLUGIN_DOCKER_LOGIN_COMMAND:-}" != "" ]]; then
   echo "🛠  Executing Docker login command"
   sh -c "${PLUGIN_DOCKER_LOGIN_COMMAND}" 2>&1 | sed "s/^/    /g"
@@ -53,8 +54,8 @@ fi
 
 cd ${CI_WORKSPACE}
 
-echo "🚚 Pulling build image: ${PLUGIN_BUILD_IMAGE}"
-docker pull ${PLUGIN_BUILD_IMAGE} 2>&1 | sed 's/^/   /g'
+echo "🚚 Pulling build image: ${PLUGIN_IMAGE}"
+docker pull ${PLUGIN_IMAGE} 2>&1 | sed 's/^/   /g'
 
 # Ensure that secrets (passed through as env vars) are available. Iterate and purposefully omit newlines.
 for k in $(compgen -e); do
@@ -62,16 +63,17 @@ for k in $(compgen -e); do
 done
 
 echo -e "\n\n"
-MSG="🚀 About to run command: ${PLUGIN_CMD} on image ${PLUGIN_BUILD_IMAGE} inside Docker-in-Docker"
+MSG="🚀 About to run command: ${PLUGIN_COMMANDS} on image ${PLUGIN_IMAGE} inside Docker-in-Docker"
 echo -e $MSG
 echo -n " $MSG" | sed 's/./=/g'
 echo -e "\n\n"
 
 CMD="docker run -v /var/run/docker.sock:/var/run/docker.sock \
+                $(for i in $(echo ${PLUGIN_MOUNTS:-} | sed "s/,/ /g"); do echo " -v $i:$i"; done)
                 -v ${PWD}:${PWD} -w ${PWD} --rm \
                 --env-file ${PWD}/outer_env_vars.env \
                 ${EXTRA_DOCKER_OPTIONS:-} \
-                ${PLUGIN_BUILD_IMAGE} ${PLUGIN_CMD}"
+                ${PLUGIN_IMAGE} ${PLUGIN_COMMANDS}"
 
 echo -n "$ "
 echo $CMD

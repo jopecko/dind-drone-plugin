@@ -1,5 +1,11 @@
-pipeline:
-  build:
-    image: quay.io/testcontainers/dind-drone-plugin
-    build_image: openjdk:8-jdk
-    cmd: java -v
+kind: pipeline
+name: default
+
+steps:
+  - name: build
+    image: jopecko/dind-drone-plugin
+    privileged: true
+    settings:
+      image: openjdk:8-jdk
+      commands:
+      - java -v
